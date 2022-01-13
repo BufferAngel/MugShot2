@@ -18,7 +18,7 @@ if (!isset($conf['MugShot'])):
   load_conf_from_db();
 endif;
 
-$conf['MugShot'] = unserialize($conf['MugShot']);
+$conf['MugShot'] = safe_unserialize($conf['MugShot']);
 
 /*
  * Plugin Constants
@@ -244,7 +244,7 @@ function insert_tag_list() {
 
   global $template;
 
-  $plugin_config = unserialize(conf_get_param(MUGSHOT_ID));
+  $plugin_config = safe_unserialize(conf_get_param(MUGSHOT_ID));
 
   $max_tags = $plugin_config['max_tags'] ?? 500;
 

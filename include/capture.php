@@ -42,7 +42,7 @@ function book_mugshots($data, &$service) {
   }
 
   $imageId = pwg_db_real_escape_string($data['imageId']);
-  $plugin_config = unserialize(conf_get_param(MUGSHOT_ID));
+  $plugin_config = safe_unserialize(conf_get_param(MUGSHOT_ID));
 
   unset($data['imageId']);
   $imageIdTagIdInsertionString = '';             // 
