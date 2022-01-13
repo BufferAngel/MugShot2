@@ -321,7 +321,7 @@ var MugShot = {
     btn.className = 'mugshot-done-button';
     btn.id = 'mugShotSubmit';
     btn.style.left = '0px';
-    btn.style.top = '0px';
+    btn.style.bottom = '0px';
     btn.onclick = this.submitMugShots.bind(this);
     this.submitBtn = btn;
     document.getElementById(this.id2).append(btn);
