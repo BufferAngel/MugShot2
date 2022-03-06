@@ -12,15 +12,11 @@ var MugShot = {
   cfi: -1,
 
   init: (function (f) {
-    this.img = document.getElementById(this.id);
-    this.offset = this.img.getBoundingClientRect();
-
-    if (f !== -1) {
-      var derivatives = document.querySelectorAll('[id^="derivative"]');
-      [].forEach.call(derivatives, refreshOnResize);
-      this.drawMugShots(f);
-    }
-  }),
+    this.refreshImgData();
+    var derivatives = document.querySelectorAll('[id^="derivative"]');
+    [].forEach.call(derivatives, refreshOnResize);
+    this.drawMugShots(f);
+   }),
 
   /**
    * Places mugshot elements on the page in their
@@ -49,14 +45,14 @@ var MugShot = {
     this.cfi += 1;
     var id = 'frame_' + this.cfi;
     var box = document.createElement('div');
-    box.className = 'mugshot-frame mugshot-mousetrap';
-    box.id = id;
-    box.style.height = frame.height + 'px';
-    box.style.left = frame.lft + 'px';
-    box.style.top = frame.top + 'px';
-    box.style.width = frame.width + 'px';
     box.title = frame.name;
-    if(frame.name) {
+    box.id = id;
+    box.className = 'mugshot-frame mugshot-mousetrap mugshot-' + (frame.confirmed == '1' ? 'confirmed' : 'unconfirmed');
+    box.style.top = frame.top + 'px';
+    box.style.left = frame.lft + 'px';
+    box.style.height = frame.height + 'px';
+    box.style.width = frame.width + 'px';
+    if (frame.name && frame.tagId != "-1") {
       var nameEl = document.createElement('a');
       nameEl.className = 'mugshot-frame-name';
       nameEl.href = frame.tag_url;
@@ -67,14 +63,18 @@ var MugShot = {
     this.mugs[this.cfi] = {
       frame: {
         el: box,
-        height: frame.height,
         id: id,
-        imageHeight: (frame.image_height) ? frame.image_height : this.img.height,
-        imageWidth: (frame.image_width) ? frame.image_width : this.img.width,
-        left: frame.lft,
         name: (frame.name) ? frame.name : '',
+        prevName: (frame.name) ? frame.name : '',
         top: frame.top,
+        left: frame.lft,
+        height: frame.height,
         width: frame.width,
+        imageWidth: (frame.image_width) ? frame.image_width : this.img.width,
+        imageHeight: (frame.image_height) ? frame.image_height : this.img.height,
+        tagId: (frame.tag_id) ? frame.tag_id : -1,
+        confirmed: frame.confirmed,
+        prevConfirmed: frame.confirmed,
       },
     };
   }),
@@ -100,11 +100,12 @@ var MugShot = {
     MugShot.mugs[i].active = false;
   }),
 
-  refreshBoundingBoxPosition: (function (left, top, height, width) {
-    this.mugs[this.cfi].frame.el.style.top = top + 'px';
-    this.mugs[this.cfi].frame.el.style.left = left  + 'px';
-    this.mugs[this.cfi].frame.el.style.height = height + 'px';
-    this.mugs[this.cfi].frame.el.style.width = width + 'px';
+  refreshBoundingBoxPosition: (function (left, top, height, width, index) {
+    index = (index !== false) ? index : this.cfi;
+    this.mugs[index].frame.el.style.top = top + 'px';
+    this.mugs[index].frame.el.style.left = left  + 'px';
+    this.mugs[index].frame.el.style.height = height + 'px';
+    this.mugs[index].frame.el.style.width = width + 'px';
   }),
 
   refreshCapture: (function () {
@@ -113,22 +114,24 @@ var MugShot = {
       var len = this.mugs.length;
 
       for (var i = 0; i < len; i++) {
-        var name = document.getElementById('name_' + i);
-        var frame = document.getElementById('frame_' + i);
         var scaleX = this.img.width / this.mugs[i].frame.imageWidth;
         var scaleY = this.img.height / this.mugs[i].frame.imageHeight;
 
-        var left = parseInt(this.img.offsetLeft + this.mugs[i].frame.left * scaleX);
-        var top = parseInt(this.img.offsetTop + this.mugs[i].frame.top * scaleY);
-        var width = parseInt(this.mugs[i].frame.width * scaleX);
-        var height = parseInt(this.mugs[i].frame.height * scaleY);
-
-        this.mugs[i].frame.el.style.left = left + 'px';
-        this.mugs[i].frame.el.style.top = top + 'px';
-        this.mugs[i].frame.el.style.width = width + 'px';
-        this.mugs[i].frame.el.style.height = height + 'px';
+        if (scaleX != 1) {
+          var mug = this.mugs[i].frame;
+          var left = Math.floor(this.img.offsetLeft + parseInt(mug.left) * scaleX);
+          var top = Math.floor(this.img.offsetTop + parseInt(mug.top) * scaleY);
+          var width = Math.floor(parseInt(mug.width) * scaleX);
+          var height = Math.floor(parseInt(mug.height) * scaleY);
+          this.refreshBoundingBoxPosition(left, top, height, width, i);
+        }
       }
     }
+  }),
+
+  refreshImgData: (function () {
+    this.img = document.getElementById(this.id);
+    this.offset = this.img.getBoundingClientRect();
   }),
 };
 
@@ -140,11 +143,11 @@ function refreshOnResize(e) {
   if (e.type == 'resize') {
     MugShot.refreshCapture();
   } else if (e.type == 'scroll') {
-    MugShot.init(-1);
+    MugShot.refreshImgData();
     MugShot.refreshCapture();
-  }else {
+  } else {
     MugShot.img.onload = function () {
-      MugShot.init(-1);
+      MugShot.refreshImgData();
       MugShot.refreshCapture();
     };
   }

@@ -1,13 +1,12 @@
 <?php
 
-if (!defined('PHPWG_ROOT_PATH')) die('Hacking attempt!');
-
+defined('PHPWG_ROOT_PATH') or die('Hacking attempt!');
 
 /*
  * Creates the tagging user group and associates the current user with that group;
  */
 function create_tag_group() {
-    global $conf;
+    global $conf, $config_default;
 
     if (!isset($conf['MugShot'])):
       include(dirname(__FILE__).'/config_default.inc.php');
@@ -15,7 +14,7 @@ function create_tag_group() {
       load_conf_from_db();
     endif;
 
-    $conf['MugShot'] = unserialize($conf['MugShot']);
+    $conf['MugShot'] = safe_unserialize($conf['MugShot']);
 
     // Checks to see if a taggers group exists.
     $checkTaggerGroupQuery = "SELECT id FROM " . GROUPS_TABLE . " WHERE name='Taggers'";
@@ -24,7 +23,7 @@ function create_tag_group() {
 
     if ($result == 0)
     {
-      $makeTaggerGroupQuery = "INSERT INTO " . GROUPS_TABLE . ' (name) VALUES ("Taggers")';
+      $makeTaggerGroupQuery = 'INSERT INTO ' . GROUPS_TABLE . ' (name) VALUES ("Taggers")';
       pwg_query($makeTaggerGroupQuery);
       
       $result = fetch_sql($checkTaggerGroupQuery, 'id', false);
@@ -68,7 +67,7 @@ function create_tag_drop_trigger() {
     // This query is silently failing.
     $makeTriggerQuery = "CREATE TRIGGER `sync_mug_shot`
       AFTER DELETE ON ".TAGS_TABLE."
-      FOR EACH ROW DELETE FROM face_tag_positions
+      FOR EACH ROW UPDATE face_tag_positions SET tag_id = NULL, confirmed = FALSE
       WHERE face_tag_positions.tag_id = old.id";
 
     pwg_query($makeTriggerQuery);
@@ -77,31 +76,139 @@ function create_tag_drop_trigger() {
 /*
  * Creates the MugShot face tag table with all data columns required for resizing.
  */
-function create_facetag_table() {
-    $configQuery = 'INSERT INTO ' . CONFIG_TABLE . ' (param,value,comment) VALUES ("MugShot","","MugShot configuration values");';
+function create_facetag_table($copy=false) {
+    $configQuery = 'INSERT INTO ' . CONFIG_TABLE . ' (param,value,comment) VALUES ("MugShot","","MugShot configuration values") ON DUPLICATE KEY UPDATE comment = "MugShot configuration values";';
 
-    pwg_query($configQuery);
+  pwg_query($configQuery);
 
-    $createTableQuery = 'CREATE TABLE IF NOT EXISTS `face_tag_positions` (
-      `image_id` mediumint(8) unsigned NOT NULL default "0",
-      `tag_id` smallint(5) unsigned NOT NULL default "0",
-      `top` float unsigned NOT NULL default "0",
-      `lft` float unsigned NOT NULL default "0",
-      `width` float unsigned NOT NULL default "0",
-      `height` float unsigned NOT NULL default "0",
-      `image_width` float unsigned NOT NULL default "0",
-      `image_height` float unsigned NOT NULL default "0",
-      PRIMARY KEY (`image_id`,`tag_id`)
-    )';
+  $table_name = MUGSHOT_TABLE . ($copy ? "-copy" : "");
 
-    pwg_query($createTableQuery);
+  $createTableQuery = "
+CREATE TABLE IF NOT EXISTS " . $table_name . "(
+      `id` mediumint(8) unsigned auto_increment NOT NULL primary key,
+      `image_id` mediumint(8) unsigned NOT NULL default 0,
+      `face_index` smallint(5) unsigned default NULL,
+      `tag_id` smallint(5) unsigned default null,
+      `top` float unsigned NOT NULL default 0.0,
+      `lft` float unsigned NOT NULL default 0.0,
+      `width` float unsigned NOT NULL default 0.0,
+      `height` float unsigned NOT NULL default 0.0,
+      `image_width` float unsigned NOT NULL default 0.0,
+      `image_height` float unsigned NOT NULL default 0.0,
+      `confirmed` bool NOT NULL default false,
+      `ignored` bool NOT NULL default false
+    );
+"
+."CREATE INDEX `ftp_index_image_tag` on ".$table_name." (`image_id`, `tag_id`);"
+."CREATE INDEX `ftp_index_image_face` on ".$table_name." (`image_id`, `face_index`);";
+
+  pwg_multi_query($createTableQuery);
+
+  if ($copy) {
+    $sql_copy_data = "
+        INSERT INTO " . $table_name . " AS new (id, image_id, face_index, tag_id, top, lft, width, height, 
+        image_width, image_height, confirmed, ignored) SELECT prev.id, prev.image_id, prev.face_index, prev.tag_id, prev.top, prev.lft, prev.width, prev.height, 
+        prev.image_width, prev.image_height, prev.confirmed, prev.ignored FROM ".MUGSHOT_TABLE." AS prev;
+    ";
+  }
+}
+
+
+/**
+ * Execute a multi-statement query
+ *
+ * @param string $query
+ * @return array
+ */
+function pwg_multi_query(string $query): array
+{
+  global $mysqli;
+
+  $mysqli->multi_query($query);
+
+  $result = [];
+
+  do {
+      /* store the result set in PHP */
+      $stmt_result = $mysqli->store_result();
+      if ($stmt_result != false) {
+          $result[] = $stmt_result->fetch_all(MYSQLI_ASSOC);
+      } else {
+          $result[] = false;
+      }
+  } while ($mysqli->next_result());
+  return $result;
+}
+
+
+/*
+ * Updates a table to add a new column if it doesn't already exist.
+ */
+/**
+ * @param $table
+ * @param $column
+ * @param $column_type
+ * @param $default_option
+ * @return bool
+ */
+function AddColumnIfNotExists($table, $column, $column_type, $default_option): bool
+{
+  $addColumnQuery = <<<SQL_TEXT
+SELECT COUNT(*)
+  INTO @exist
+  FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = '$table'
+    AND COLUMN_NAME = '$column' LIMIT 1;
+    
+SET @query = IF(@exist <= 0, 'ALTER TABLE $table ADD COLUMN $column $column_type $default_option;',
+                'SELECT 1');
+
+PREPARE statement FROM @query;
+EXECUTE statement;
+DEALLOCATE PREPARE statement;
+SQL_TEXT;
+
+  $result = [];
+  try {
+    $result = pwg_multi_query($addColumnQuery);
+  } catch(Exception $e) {
+    //var_dump($e);
+  }
+
+  if (count($result) >= 5) {
+    if ($result[3] == false) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
+/*
+ * Updates the MugShot face tag table with all data columns required for resizing.
+ */
+function update_facetag_table() {
+  $result = AddColumnIfNotExists(MUGSHOT_TABLE, 'id', 'mediumint(8) unsigned auto_increment', 'NOT NULL primary key FIRST');
+  $result = AddColumnIfNotExists(MUGSHOT_TABLE, 'ignored', 'BOOL', 'NOT NULL DEFAULT false');
+  $result = AddColumnIfNotExists(MUGSHOT_TABLE, 'confirmed', 'BOOL', 'NOT NULL DEFAULT false');
+  $result = AddColumnIfNotExists(MUGSHOT_TABLE, 'face_index', 'BOOL', 'NULL');
+
+  if ($result) {
+    // Column was created mark existing entries that are not unidentified as confirmed
+    // Initialize confirmed for user-created entries
+    $updateConfirmedQuery = 'UPDATE '.MUGSHOT_TABLE.' set confirmed = true where tag_id not in (select id from `piwigo_tags` WHERE `name` LIKE "Unidentified Person #%");';
+
+    pwg_query($updateConfirmedQuery);
+  }
 }
 
 /*
  * Fetches Sql
  */
 function fetch_sql($sql, $col, $ser) {
-    $result = pwg_query($sql);
+  $result = pwg_query($sql);
   
     while ($row = pwg_db_fetch_assoc($result)) {
       $data[] = $row;
@@ -118,4 +225,4 @@ function fetch_sql($sql, $col, $ser) {
     return ($ser) ? json_encode($data) : $data;
   }
 
-  ?>
+?>

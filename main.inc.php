@@ -1,16 +1,16 @@
 <?php
 /*
 Plugin Name: Mug Shot
-Version: 2.0.2
+Version: 2.0.2-0.1
 Description: Improved face tagging for Piwigo
 Plugin URI: http://piwigo.org/ext/extension_view.php?eid=910
 Author: ccraige90
 Has Settings: webmaster
 */
 
-if (!defined('PHPWG_ROOT_PATH')) die('Hacking attempt!');
+defined('PHPWG_ROOT_PATH') or die('Hacking attempt!');
 
-global $conf;
+global $conf, $config_default;
 
 if (!isset($conf['MugShot'])):
   include(dirname(__FILE__).'/include/config_default.inc.php');
@@ -27,22 +27,31 @@ define('MUGSHOT_ID',      basename(dirname(__FILE__)));
 define('MUGSHOT_PATH' ,   PHPWG_PLUGINS_PATH . MUGSHOT_ID . '/');
 define('MUGSHOT_ADMIN',   get_root_url() . 'admin.php?page=plugin-' . MUGSHOT_ID);
 define('MUGSHOT_BASE_URL',   get_root_url() . 'admin.php?page=plugin-' . MUGSHOT_ID);
-define('MUGSHOT_VERSION', '2.0.2');
-define('MUGSHOT_TABLE', '`face_tag_positions`');
+define('MUGSHOT_VERSION', '2.0.2-0.1');
+define('MUGSHOT_TABLE', 'face_tag_positions');
 
+include_once MUGSHOT_PATH . 'include/logger.inc.php';
 
 /*
  * API Functions
  */
-$ws_file = MUGSHOT_PATH . 'include/capture.php';
-
+//$ws_file = MUGSHOT_PATH . 'include/capture.php';
 
 /*
  * Admin Event Handlers
  */
+$events_class_file = MUGSHOT_PATH . 'include/mugshot_events.class.php';
+$services_class_file = MUGSHOT_PATH . 'include/mugshot_services.class.php';
+
 add_event_handler('init', 'mugshot_lang_init');
 add_event_handler('loc_begin_page_header', 'mugshot_files', 40, 2);
 add_event_handler('loc_end_picture', 'mugshot_button');
+add_event_handler('blockmanager_register_blocks', array('MugShot_Events', 'blockmanager_register_blocks'),
+    EVENT_HANDLER_PRIORITY_NEUTRAL, $events_class_file);
+add_event_handler('loc_end_section_init', array('MugShot_Events', 'loc_end_section_init'),
+    EVENT_HANDLER_PRIORITY_NEUTRAL, $events_class_file);
+add_event_handler('blockmanager_prepare_display', array('MugShot_Events', 'blockmanager_prepare_display'),
+    EVENT_HANDLER_PRIORITY_NEUTRAL, $events_class_file);
 
 /*
  * Include custom helper functions
@@ -61,7 +70,7 @@ if (count($current_user_groups) != 0) {
 
   $group_list = $plugin_config['groups'] ?? array();
 
-  if(is_array($group_list) && count($group_list) != 0) {
+  if (is_array($group_list) && count($group_list) != 0) {
     $intersect = array_intersect($group_list, $current_user_groups);
   }
 }
@@ -74,9 +83,6 @@ if (is_array($current_user_groups) && count($intersect) != 0) {
 
   switch ($theme) {
     case 'bootstrap_darkroom':
-      define('BOOT', 1);
-      break;
-
     case 'bootstrapdefault':
       define('BOOT', 1);
       break;
@@ -88,10 +94,14 @@ if (is_array($current_user_groups) && count($intersect) != 0) {
 
   define('MUGSHOT_USER_ADMIN', true);
 
-  if(script_basename() != 'admin') {
+  if (script_basename() != 'admin') {
+
+    add_event_handler('blockmanager_apply', array('MugShot_Events', 'blockmanager_apply'),
+        EVENT_HANDLER_PRIORITY_NEUTRAL+10, $events_class_file);
+
     add_event_handler('loc_end_page_tail', 'insert_tag_list');
   }
-  add_event_handler('ws_add_methods', 'add_MUGSHOT_methods', EVENT_HANDLER_PRIORITY_NEUTRAL, $ws_file);
+  add_event_handler('ws_add_methods', array('MugShot_Services', 'add_mugshot_methods'), EVENT_HANDLER_PRIORITY_NEUTRAL, $services_class_file);
 } else {
   define('MUGSHOT_USER_ADMIN', false);
 }
@@ -165,38 +175,44 @@ function defined_tags($max_tags) {
  * Queries tagged faces for the image id
  */
 function defined_mugshots( $id ) {
-  $mugshotSql = '
+  $mugshotSql = "
   SELECT
     mst.image_id,
-    mst.tag_id,
+    if(not isnull(mst.tag_id), mst.tag_id, 0) as tag_id,
+    if(not isnull(mst.face_index) and mst.face_index > 0, mst.face_index, -1) as face_index,
     mst.top,
     mst.lft,
     mst.width,
     mst.height,
     mst.image_width,
     mst.image_height,
-    tt.name
-  FROM ' . MUGSHOT_TABLE . ' AS mst
-  INNER JOIN `' . TAGS_TABLE . '` AS tt ON mst.tag_id = tt.id
-  WHERE mst.image_id = ' . $id . ';';
+    mst.confirmed,
+    if(not isnull(tt.name), tt.name, 'Unidentified Person') as name
+  FROM " . MUGSHOT_TABLE . " AS mst
+  LEFT JOIN `" . TAGS_TABLE . "` AS tt ON mst.tag_id = tt.id
+  WHERE mst.image_id = $id AND mst.ignored = 0;";
 
   $mugshotSqlResult = fetch_sql($mugshotSql, false, false);
 
   if (is_array($mugshotSqlResult)) {
     foreach($mugshotSqlResult as $key => $mugshot) {
-      $tagSql = '
-      SELECT
-        id,
-        url_name
-      FROM ' . TAGS_TABLE . '
-      WHERE id=' . $mugshot['tag_id'] . ';
-      ';
-      $tagSqlResult = fetch_sql($tagSql, false, false);
-      $tagUrl = make_index_url(array('tags' => array($tagSqlResult[0])));
-      $mugshotSqlResult[$key]['tag_url'] = $tagUrl;
+      $tag_id = $mugshot['tag_id'];
+      if ($tag_id > 0) {
+        $tagSql = '
+          SELECT
+            id,
+            url_name
+          FROM ' . TAGS_TABLE . '
+          WHERE id=' . $mugshot['tag_id'] . ';
+        ';
+        $tagSqlResult = fetch_sql($tagSql, false, false);
+        $tagUrl = make_index_url(array('tags' => array($tagSqlResult[0])));
+        $mugshotSqlResult[$key]['tag_url'] = $tagUrl;
+      } else {
+        $mugshotSqlResult[$key]['tag_url'] = '';
+      }
     }
   }
-
 
   return json_encode($mugshotSqlResult);
 }

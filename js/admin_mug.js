@@ -67,9 +67,9 @@ var MugShot = {
     w.style.left = this.offset.left - this.poffset.left + 'px';
     w.style.top = parentStyles.paddingTop;
     w.style.width = this.offset.width + 'px';
-    w.style.height = this.offset.height + 'px';
+    w.style.height = '100%';
     w.style.zIndex = 1000;
-    document.getElementById('theImage').append(w)
+    document.getElementById('theImage').append(w);
   }),
 
   updateWrapper: (function () {
@@ -79,7 +79,6 @@ var MugShot = {
     w.style.left = this.offset.left - this.poffset.left + 'px';
     w.style.top = parentStyles.paddingTop;
     w.style.width = this.offset.width + 'px';
-    w.style.height = this.offset.height + 'px';
   }),
 
   assignEventListeners: (function () {
@@ -157,6 +156,9 @@ var MugShot = {
       if (frames.hasOwnProperty(frameIndex)) {
         this.createBoundingBox(frames[frameIndex]);
         this.createTextBox();
+        if (!this.mugs[this.cfi].frame.confirmed && this.mugs[this.cfi].frame.tagId > 0) {
+          this.createConfirmButton();
+        }
         this.createDeleteButton();
         this.mugs[this.cfi].frame.el.ondblclick = updateBoundingBox;
         this.mugs[this.cfi].active = false;
@@ -178,12 +180,12 @@ var MugShot = {
     var box = document.createElement('div');
     box.title = id;
     box.id = id;
-    box.className = 'mugshot-frame mugshot-mousetrap';
+    box.className = 'mugshot-frame mugshot-mousetrap mugshot-' + (parseInt(frame.confirmed) ? 'confirmed' : 'unconfirmed');
     box.style.top = frame.top + 'px';
     box.style.left = frame.lft + 'px';
     box.style.height = frame.height + 'px';
     box.style.width = frame.width + 'px';
-    if(frame.name) {
+    if (frame.name && frame.tagId != -1) {
       var nameEl = document.createElement('a');
       nameEl.className = 'mugshot-frame-name';
       nameEl.href = frame.tag_url;
@@ -199,13 +201,17 @@ var MugShot = {
         el: box,
         id: id,
         name: (frame.name) ? frame.name : '',
-        top: frame.top,
-        left: frame.lft,
-        height: frame.height,
-        width: frame.width,
-        imageWidth: (frame.image_width) ? frame.image_width : this.img.width,
-        imageHeight: (frame.image_height) ? frame.image_height : this.img.height,
-        tagId: (frame.tag_id) ? frame.tag_id : -1,
+        prevName: this.name,
+        faceIndex: parseInt(frame.face_index),
+        top: parseInt(frame.top),
+        left: parseInt(frame.lft),
+        height: parseInt(frame.height),
+        width: parseInt(frame.width),
+        imageWidth: (frame.image_width) ? parseInt(frame.image_width) : this.img.width,
+        imageHeight: (frame.image_height) ? parseInt(frame.image_height) : this.img.height,
+        tagId: (frame.tag_id) ? parseInt(frame.tag_id) : -1,
+        confirmed: parseInt(frame.confirmed),
+        prevConfirmed: this.confirmed,
         removeThis: 0,
       },
       name: {
@@ -213,6 +219,10 @@ var MugShot = {
         id: 'name_' + this.cfi,
         left: 0,
         top: 0,
+      },
+      confirm: {
+        el: '',
+        id: 'confirm_' + this.cfi,
       },
       remove: {
         el: '',
@@ -239,6 +249,8 @@ var MugShot = {
     MugShot.toggleElementSet(i, 'off');
     MugShot.mugs[i].frame.name = el.value;
     MugShot.mugs[i].frame.el.title = el.value;
+    MugShot.mugs[i].frame.confirmed = true;
+    MugShot.mugs[i].frame.el.classList.replace('mugshot-unconfirmed', 'mugshot-confirmed');
     MugShot.mugs[i].active = false;
   }),
 
@@ -304,6 +316,16 @@ var MugShot = {
     document.getElementById(this.id2).append(name);
     this.mugs[this.cfi].name.el = name;
     this.mugs[this.cfi].frame.el.title = name.value;
+  }),
+
+  createConfirmButton: (function () {
+    var btn = document.createElement('span');
+    btn.className = 'mugshot-confirm mugshot-icon mugshot-icon-checkmark';
+    btn.title = 'Confirm Tag';
+    btn.id = 'confirm_' + this.cfi;
+    btn.onclick = this.confirmMugShot.bind(this);
+    this.mugs[this.cfi].confirm.el = btn;
+    this.mugs[this.cfi].frame.el.append(btn);
   }),
 
   createDeleteButton: (function () {
@@ -388,6 +410,7 @@ var MugShot = {
     } else {
       console.log('Error: Unsuccessfully updated Database');
     }
+    location.reload();
   }),
 
   resetMugShot: (function () {
@@ -396,6 +419,13 @@ var MugShot = {
     this.img.style.cursor = 'auto';
     this.img.removeEventListener('mousedown', beginCapture);
     document.removeEventListener('keydown', reverseCapture);
+  }),
+
+  confirmMugShot: (function (e) {
+    var index = parseInt(e.target.id.replace('confirm_', ''));
+    this.mugs[index].confirm.el.remove();
+    this.mugs[index].frame.confirmed = true;
+    this.mugs[index].frame.el.classList.replace('mugshot-unconfirmed', 'mugshot-confirmed');
   }),
 
   deleteMugShot: (function (e) {
@@ -426,6 +456,7 @@ function beginCapture(e) {
       'top': e.pageY - MugShot.offset.top,
       'height': 5,
       'width': 5,
+      'confirmed': true
     };
 
     MugShot.createBoundingBox(frame);
@@ -482,6 +513,7 @@ function updateBoundingBox(e) {
     MugShot.toggleSubmitBtn('on');
     MugShot.toggleElementSet(index, 'on');
     MugShot.mugs[index].active = true;
+    MugShot.mugs[index].name.el.focus();
   }
 }
 
@@ -502,6 +534,9 @@ function doneWithText(e) {
     var v = (vis.length == 1) ? vis[0].innerHTML : e.target.value;
     MugShot.mugs[index].frame.name = v;
     MugShot.mugs[index].frame.el.title = v;
+    MugShot.mugs[index].frame.confirmed = true;
+    MugShot.mugs[index].frame.el.classList.replace('mugshot-unconfirmed', 'mugshot-confirmed');
+
     MugShot.mugs[index].active = false;
     MugShot.tagList.style.display = 'none';
   } else {
