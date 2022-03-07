@@ -33,11 +33,6 @@ define('MUGSHOT_TABLE', 'face_tag_positions');
 include_once MUGSHOT_PATH . 'include/logger.inc.php';
 
 /*
- * API Functions
- */
-//$ws_file = MUGSHOT_PATH . 'include/capture.php';
-
-/*
  * Admin Event Handlers
  */
 $events_class_file = MUGSHOT_PATH . 'include/mugshot_events.class.php';
@@ -106,6 +101,30 @@ if (is_array($current_user_groups) && count($intersect) != 0) {
   define('MUGSHOT_USER_ADMIN', false);
 }
 
+/*
+ * Test to see if the upload fires as expected
+ */
+function create_facetag_tableb() {
+
+
+}
+
+function mugshot_queue_for_processing($image_info) {
+  $createTableQuery = 'CREATE TABLE IF NOT EXISTS `face_tag_queue` (
+    `image_id` mediumint(8) unsigned NOT NULL default "0",
+    `stuff` varchar(5000) NOT NULL default "0",
+    PRIMARY KEY (`image_id`)
+  )';
+
+  pwg_query($createTableQuery);
+
+  $item = serialize($image_info);
+  $id = $image_info['id'];
+
+  $insertImageQueueQuery = "INSERT INTO `face_tag_queue` (image_id, stuff) VALUES ('$id','$item')";
+
+  pwg_query($insertImageQueueQuery);
+}
 
 /*
  * Loads translations
