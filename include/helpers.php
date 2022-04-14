@@ -23,7 +23,9 @@ function create_tag_group() {
 
     if ($result == 0)
     {
-      $makeTaggerGroupQuery = 'INSERT INTO ' . GROUPS_TABLE . ' (name) VALUES ("Taggers")';
+      $makeTaggerGroupQuery = '# noinspection SqlResolve
+
+INSERT INTO ' . GROUPS_TABLE . ' (name) VALUES ("Taggers")';
       pwg_query($makeTaggerGroupQuery);
       
       $result = fetch_sql($checkTaggerGroupQuery, 'id', false);
@@ -77,7 +79,9 @@ function create_tag_drop_trigger() {
  * Creates the MugShot face tag table with all data columns required for resizing.
  */
 function create_facetag_table($copy=false) {
-    $configQuery = 'INSERT INTO ' . CONFIG_TABLE . ' (param,value,comment) VALUES ("MugShot","","MugShot configuration values") ON DUPLICATE KEY UPDATE comment = "MugShot configuration values";';
+    $configQuery = '# noinspection SqlResolve
+
+INSERT INTO ' . CONFIG_TABLE . ' (param,value,comment) VALUES ("MugShot","","MugShot configuration values") ON DUPLICATE KEY UPDATE comment = "MugShot configuration values";';
 
   pwg_query($configQuery);
 
@@ -190,15 +194,15 @@ SQL_TEXT;
  * Updates the MugShot face tag table with all data columns required for resizing.
  */
 function update_facetag_table() {
-  $result = AddColumnIfNotExists(MUGSHOT_TABLE, 'id', 'mediumint(8) unsigned auto_increment', 'NOT NULL primary key FIRST');
-  $result = AddColumnIfNotExists(MUGSHOT_TABLE, 'ignored', 'BOOL', 'NOT NULL DEFAULT false');
-  $result = AddColumnIfNotExists(MUGSHOT_TABLE, 'confirmed', 'BOOL', 'NOT NULL DEFAULT false');
-  $result = AddColumnIfNotExists(MUGSHOT_TABLE, 'face_index', 'BOOL', 'NULL');
+  $result = AddColumnIfNotExists(MUGSHOT_TABLE, 'id', 'mediumint(8) unsigned auto_increment NOT NULL', 'primary key FIRST');
+  $result = AddColumnIfNotExists(MUGSHOT_TABLE, 'face_index', 'smallint(5) unsigned', 'default NULL AFTER image_id');
+  $result = AddColumnIfNotExists(MUGSHOT_TABLE, 'confirmed', 'BOOL NOT NULL', 'DEFAULT false AFTER image_height');
+  $result = AddColumnIfNotExists(MUGSHOT_TABLE, 'ignored', 'BOOL NOT NULL', 'DEFAULT false AFTER confirmed');
 
   if ($result) {
     // Column was created mark existing entries that are not unidentified as confirmed
     // Initialize confirmed for user-created entries
-    $updateConfirmedQuery = 'UPDATE '.MUGSHOT_TABLE.' set confirmed = true where tag_id not in (select id from `piwigo_tags` WHERE `name` LIKE "Unidentified Person #%");';
+    $updateConfirmedQuery = 'UPDATE '.MUGSHOT_TABLE.' set confirmed = true where tag_id not null and is null);';
 
     pwg_query($updateConfirmedQuery);
   }
@@ -224,5 +228,3 @@ function fetch_sql($sql, $col, $ser) {
   
     return ($ser) ? json_encode($data) : $data;
   }
-
-?>

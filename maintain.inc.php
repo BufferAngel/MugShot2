@@ -41,7 +41,7 @@ class MugShot_maintain extends PluginMaintain
   {
     global $MugShot_logger;
 
-    //$MugShot_logger->info("Entered ...", array('File'=>__FILE__,'Line'=>__LINE__,'Class'=>__CLASS__,'Function'=>__FUNCTION__));
+    $MugShot_logger->info("Entered ...", array('File'=>__FILE__,'Line'=>__LINE__,'Class'=>__CLASS__,'Function'=>__FUNCTION__));
 
     // Create the table to store face vector information
     create_facetag_table();
@@ -62,7 +62,7 @@ class MugShot_maintain extends PluginMaintain
     // Do nothing
     global $MugShot_logger;
 
-    //$MugShot_logger->info("Entered ...", array('File'=>__FILE__,'Line'=>__LINE__,'Class'=>__CLASS__,'Function'=>__FUNCTION__));
+    $MugShot_logger->info("Entered ...", array('File'=>__FILE__,'Line'=>__LINE__,'Class'=>__CLASS__,'Function'=>__FUNCTION__));
   }
 
   function update($old_version, $new_version, &$errors=array())
@@ -72,13 +72,16 @@ class MugShot_maintain extends PluginMaintain
     $MugShot_logger->info("Entered ...", array('File'=>__FILE__,'Line'=>__LINE__,'Class'=>__CLASS__,'Function'=>__FUNCTION__));
 
     update_facetag_table();
+
+    // Create the trigger to automatically clean tag references when tags are removed.
+    create_tag_drop_trigger();
   }
 
   function activate($plugin_version, &$errors=array())
   {
     global $MugShot_logger;
 
-    //$MugShot_logger->info("Entered ...", array('File'=>__FILE__,'Line'=>__LINE__,'Class'=>__CLASS__,'Function'=>__FUNCTION__));
+    $MugShot_logger->info("Entered ...", array('File'=>__FILE__,'Line'=>__LINE__,'Class'=>__CLASS__,'Function'=>__FUNCTION__));
 
     if (!$this->installed)
     {

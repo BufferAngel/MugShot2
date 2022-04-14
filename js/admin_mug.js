@@ -40,7 +40,6 @@ var MugShot = {
     this.tagList = document.getElementById('mugshot-tags');
     document.getElementById('mugshot-tags').remove();
     document.getElementById(this.id2).append(this.tagList);
-    this.imageId = imageId;
     this.postAction = action;
   }),
 
@@ -112,8 +111,24 @@ var MugShot = {
         this.mugs[i].name.el.classList.toggle('mugshot-active');
       }
 
+      if (this.mugs[i].accept_match.el !== '') {
+        if (this.mugs[i].accept_match.el.classList.contains('mugshot-active')) {
+          this.mugs[i].accept_match.el.classList.toggle('mugshot-active');
+        }
+      }
+
+      if (this.mugs[i].reject_match.el !== '') {
+        if (this.mugs[i].reject_match.el.classList.contains('mugshot-active')) {
+          this.mugs[i].reject_match.el.classList.toggle('mugshot-active');
+        }
+      }
+
       if (this.mugs[i].remove.el.classList.contains('mugshot-active')) {
         this.mugs[i].remove.el.classList.toggle('mugshot-active');
+      }
+
+      if (this.mugs[i].face_toolbar.el.classList.contains('mugshot-active')) {
+        this.mugs[i].face_toolbar.el.classList.toggle('mugshot-active');
       }
     } else if (x == 'on') {
       if (!this.mugs[i].frame.el.classList.contains('mugshot-active')) {
@@ -122,6 +137,22 @@ var MugShot = {
 
       if (!this.mugs[i].name.el.classList.contains('mugshot-active')) {
         this.mugs[i].name.el.classList.toggle('mugshot-active');
+      }
+
+      if (!this.mugs[i].face_toolbar.el.classList.contains('mugshot-active')) {
+        this.mugs[i].face_toolbar.el.classList.toggle('mugshot-active');
+      }
+
+      if (this.mugs[i].accept_match.el !== '') {
+        if (!this.mugs[i].accept_match.el.classList.contains('mugshot-active')) {
+          this.mugs[i].accept_match.el.classList.toggle('mugshot-active');
+        }
+      }
+
+      if (this.mugs[i].reject_match.el !== '') {
+        if (!this.mugs[i].reject_match.el.classList.contains('mugshot-active')) {
+          this.mugs[i].reject_match.el.classList.toggle('mugshot-active');
+        }
       }
 
       if (!this.mugs[i].remove.el.classList.contains('mugshot-active')) {
@@ -155,11 +186,8 @@ var MugShot = {
     for (var frameIndex in frames) {
       if (frames.hasOwnProperty(frameIndex)) {
         this.createBoundingBox(frames[frameIndex]);
+        this.createFaceToolbar();
         this.createTextBox();
-        if (!this.mugs[this.cfi].frame.confirmed && this.mugs[this.cfi].frame.tagId > 0) {
-          this.createConfirmButton();
-        }
-        this.createDeleteButton();
         this.mugs[this.cfi].frame.el.ondblclick = updateBoundingBox;
         this.mugs[this.cfi].active = false;
         this.mugs[this.cfi].frame.el.classList.toggle('mugshot-mousetrap');
@@ -174,24 +202,24 @@ var MugShot = {
    * @param  object frame frame object from defined_mugshots
    * @return void
    */
-  createBoundingBox: (function (frame) {
+  createBoundingBox: (function (input_frame) {
     this.cfi += 1;
     var id = 'frame_' + this.cfi;
     var box = document.createElement('div');
     box.title = id;
     box.id = id;
-    box.className = 'mugshot-frame mugshot-mousetrap mugshot-' + (parseInt(frame.confirmed) ? 'confirmed' : 'unconfirmed');
-    box.style.top = frame.top + 'px';
-    box.style.left = frame.lft + 'px';
-    box.style.height = frame.height + 'px';
-    box.style.width = frame.width + 'px';
-    if (frame.name && frame.tagId != -1) {
-      var nameEl = document.createElement('a');
-      nameEl.className = 'mugshot-frame-name';
-      nameEl.href = frame.tag_url;
-      nameEl.innerHTML = frame.name;
-      box.append(nameEl);
+    box.className = 'mugshot-frame mugshot-mousetrap mugshot-' + (parseInt(input_frame.confirmed) ? 'confirmed' : 'unconfirmed');
+    box.style.top = input_frame.top + 'px';
+    box.style.left = input_frame.lft + 'px';
+    box.style.height = input_frame.height + 'px';
+    box.style.width = input_frame.width + 'px';
+    var nameEl = document.createElement('a');
+    nameEl.className = 'mugshot-frame-name';
+    nameEl.href = input_frame.tag_url;
+    if (input_frame.tagId != null && input_frame.name != null && input_frame.name.length > 0) {
+      nameEl.innerHTML = input_frame.name;
     }
+    box.append(nameEl);
     document.getElementById(this.id2).append(box);
 
     this.mugs[this.cfi] = {
@@ -200,18 +228,19 @@ var MugShot = {
       frame: {
         el: box,
         id: id,
-        name: (frame.name) ? frame.name : '',
-        prevName: this.name,
-        faceIndex: parseInt(frame.face_index),
-        top: parseInt(frame.top),
-        left: parseInt(frame.lft),
-        height: parseInt(frame.height),
-        width: parseInt(frame.width),
-        imageWidth: (frame.image_width) ? parseInt(frame.image_width) : this.img.width,
-        imageHeight: (frame.image_height) ? parseInt(frame.image_height) : this.img.height,
-        tagId: (frame.tag_id) ? parseInt(frame.tag_id) : -1,
-        confirmed: parseInt(frame.confirmed),
-        prevConfirmed: this.confirmed,
+        faceId: input_frame.face_id,
+        name: input_frame.name,
+        prevName: input_frame.name,
+        faceIndex: input_frame.face_index,
+        tagId: input_frame.tag_id,
+        top: input_frame.top,
+        left: input_frame.lft,
+        height: input_frame.height,
+        width: input_frame.width,
+        imageWidth: (input_frame.image_width > 0) ? input_frame.image_width : this.img.width,
+        imageHeight: (input_frame.image_height > 0) ? input_frame.image_height : this.img.height,
+        confirmed: input_frame.confirmed,
+        prevConfirmed: input_frame.confirmed,
         removeThis: 0,
       },
       name: {
@@ -220,9 +249,17 @@ var MugShot = {
         left: 0,
         top: 0,
       },
-      confirm: {
+      face_toolbar: {
         el: '',
-        id: 'confirm_' + this.cfi,
+        id: 'face_toolbar_' + this.cfi,
+      },
+      accept_match: {
+        el: '',
+        id: 'accept_match_' + this.cfi,
+      },
+      reject_match: {
+        el: '',
+        id: 'reject_match_' + this.cfi,
       },
       remove: {
         el: '',
@@ -275,14 +312,13 @@ var MugShot = {
 
   refreshCapture: (function () {
     if (this.cfi !== -1) {
-
       var len = this.mugs.length;
 
       for (var i = 0; i < len; i++) {
         var scaleX = this.img.width / this.mugs[i].frame.imageWidth;
         var scaleY = this.img.height / this.mugs[i].frame.imageHeight;
 
-        if (scaleX != 1) {
+        if (scaleX !== 1) {
           var mug = this.mugs[i].frame;
           var left = Math.floor(parseInt(mug.left) * scaleX);
           var top = Math.floor(parseInt(mug.top) * scaleY);
@@ -305,37 +341,62 @@ var MugShot = {
   createTextBox: (function () {
     var mug = this.mugs[this.cfi].frame;
     var name = document.createElement('input');
-    var tagName = mug.name;
     name.addEventListener('keyup', doneWithText);
     name.id = this.mugs[this.cfi].name.id;
-    name.value = (tagName) ? tagName : '';
+    name.value = mug.name != null ? mug.name : '';
     name.className = 'mugshot-textbox';
     name.style.top = parseInt(mug.top) + parseInt(mug.height) + 'px';
     name.style.left = mug.el.style.left;
     name.style.width = mug.el.style.width;
     document.getElementById(this.id2).append(name);
     this.mugs[this.cfi].name.el = name;
-    this.mugs[this.cfi].frame.el.title = name.value;
+    this.mugs[this.cfi].frame.el.title = mug.name != null ? mug.name : 'Unidentified Person';
   }),
 
-  createConfirmButton: (function () {
+  createFaceToolbar: (function () {
+    var toolbar = document.createElement('div');
+
+    toolbar.className = 'mugshot-face-toolbar';
+    toolbar.title = 'Face Toolbar';
+    toolbar.id = 'face_toolbar_' + this.cfi;
+    this.mugs[this.cfi].face_toolbar.el = toolbar;
+    if (!this.mugs[this.cfi].frame.confirmed && this.mugs[this.cfi].frame.tagId != null &&
+        this.mugs[this.cfi].frame.tagId > 0) {
+      this.createAcceptMatchButton();
+      this.createRejectMatchButton();
+    }
+    this.createDeleteButton();
+    this.mugs[this.cfi].frame.el.append(toolbar);
+  }),
+
+  createAcceptMatchButton: (function () {
     var btn = document.createElement('span');
-    btn.className = 'mugshot-confirm mugshot-icon mugshot-icon-checkmark';
-    btn.title = 'Confirm Tag';
-    btn.id = 'confirm_' + this.cfi;
-    btn.onclick = this.confirmMugShot.bind(this);
-    this.mugs[this.cfi].confirm.el = btn;
-    this.mugs[this.cfi].frame.el.append(btn);
+    btn.className = 'mugshot-accept-match mugshot-icon mugshot-icon-thumbsup';
+    btn.title = 'Accept Match';
+    btn.id = 'accept_match_' + this.cfi;
+    btn.onclick = this.acceptMatch.bind(this);
+    this.mugs[this.cfi].accept_match.el = btn;
+    this.mugs[this.cfi].face_toolbar.el.append(btn);
+  }),
+
+  createRejectMatchButton: (function () {
+    var btn = document.createElement('span');
+    btn.className = 'mugshot-reject-match mugshot-icon mugshot-icon-thumbsdown';
+    btn.title = 'Reject Match';
+    btn.id = 'reject_match_' + this.cfi;
+    btn.onclick = this.rejectMatch.bind(this);
+    this.mugs[this.cfi].reject_match.el = btn;
+    this.mugs[this.cfi].face_toolbar.el.append(btn);
   }),
 
   createDeleteButton: (function () {
     var btn = document.createElement('span');
-    btn.className = 'mugshot-delete mugshot-icon mugshot-icon-cross';
+    btn.className = 'mugshot-delete mugshot-icon mugshot-icon-trashcan';
     btn.title = 'Delete Tag';
     btn.id = 'remove_' + this.cfi;
     btn.onclick = this.deleteMugShot.bind(this);
     this.mugs[this.cfi].remove.el = btn;
-    this.mugs[this.cfi].frame.el.append(btn);
+    this.mugs[this.cfi].face_toolbar.el.append(btn);
   }),
 
   createSubmitButton: (function () {
@@ -350,19 +411,17 @@ var MugShot = {
   }),
 
   submitMugShots: (function () {
-    var data = [];
+    var data = {};
 
     this.toggleSubmitBtn('off');
     this.tagList.style.display = 'none';
 
-    if (this.mugs.length != 0) {
+    if (this.mugs.length > 0) {
 
       data.imageId = this.mugs[0].imageId;
 
       for (var i = 0; i < this.mugs.length; i++) {
-        if (this.mugs[i].frame.tag != '') {
-          data['mug_' + i] = this.mugs[i].frame;
-        }
+        data['mug_' + i] = this.mugs[i].frame;
 
         this.mugs[i].active = false;
         this.toggleElementSet(i, 'off');
@@ -380,7 +439,7 @@ var MugShot = {
     for (p in obj) {
       if (obj.hasOwnProperty(p)) {
         k = prefix ? prefix + '[' + p + ']' : p, v = obj[p];
-        str.push((v !== null && typeof v === 'object') ?
+        str.push((v !== null && typeof v == 'object') ?
           this.urlEncodeData(v, k) :
           encodeURIComponent(k) + '=' + encodeURIComponent(v));
       }
@@ -396,11 +455,15 @@ var MugShot = {
     this.xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
     this.xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
     this.xhr.responseType = 'json';
-    this.xhr.send(this.urlEncodeData(data));
+//    let request_data = JSON.stringify(data);
+//    let request_wrapper = [];
+//    request_wrapper['data'] = request_data;
+    let request_params = this.urlEncodeData([data=>JSON.stringify(data)]); // request_wrapper);
+    this.xhr.send(request_params);
   }),
 
   parseFromServer: (function (e) {
-    if (e.target.status == 200) {
+    if (e.target.status === 200) {
 
       MugShot.resetMugShot();
 
@@ -421,18 +484,36 @@ var MugShot = {
     document.removeEventListener('keydown', reverseCapture);
   }),
 
-  confirmMugShot: (function (e) {
-    var index = parseInt(e.target.id.replace('confirm_', ''));
-    this.mugs[index].confirm.el.remove();
+  acceptMatch: (function (e) {
+    var index = parseInt(e.target.id.replace('accept_match_', ''));
+    this.mugs[index].accept_match.el.remove();
+    this.mugs[index].reject_match.el.remove();
     this.mugs[index].frame.confirmed = true;
     this.mugs[index].frame.el.classList.replace('mugshot-unconfirmed', 'mugshot-confirmed');
   }),
 
+  rejectMatch: (function (e) {
+    var index = parseInt(e.target.id.replace('reject_match_', ''));
+    this.mugs[index].accept_match.el.remove();
+    this.mugs[index].reject_match.el.remove();
+    this.mugs[index].frame.name = null;
+    this.mugs[index].frame.el.title = "Unidentified Person";
+  }),
+
   deleteMugShot: (function (e) {
     var index = parseInt(e.target.id.replace('remove_', ''));
-    this.mugs[index].frame.el.remove();
-    this.mugs[index].name.el.remove();
     this.mugs[index].remove.el.remove();
+    if (this.mugs[index].accept_match.el !== '') {
+      this.mugs[index].accept_match.el.remove();
+    }
+    if (this.mugs[index].reject_match.el !== '') {
+      this.mugs[index].reject_match.el.remove();
+    }
+    if (this.mugs[index].face_toolbar.el !== '') {
+      this.mugs[index].face_toolbar.el.remove();
+    }
+    this.mugs[index].name.el.remove();
+    this.mugs[index].frame.el.remove();
     this.mugs[index].frame.removeThis = 1;
     this.toggleElementSet(index, 'off');
     this.toggleSubmitBtn('on');
@@ -445,7 +526,7 @@ var MugShot = {
  * Listed here for easier removal
  */
 function beginCapture(e) {
-  if (e.which == 1) {
+  if (e.which === 1) {
     MugShot.selecting = true;
     MugShot.img.addEventListener('mousemove', updateCapture);
     MugShot.img.addEventListener('mouseup', haltCapture);
@@ -500,8 +581,8 @@ function haltCapture(e) {
   MugShot.mugs[MugShot.cfi].frame.width = pos[3];
   MugShot.mugs[MugShot.cfi].name.top = pos[1] + pos[2];
   MugShot.mugs[MugShot.cfi].name.left = pos[0];
+  MugShot.createFaceToolbar();
   MugShot.createTextBox();
-  MugShot.createDeleteButton();
   MugShot.toggleElementSet(MugShot.cfi, 'on');
   MugShot.mugs[MugShot.cfi].name.el.focus();
 }
@@ -518,7 +599,7 @@ function updateBoundingBox(e) {
 }
 
 function reverseCapture(e) {
-  if (e.keyCode == 90 && e.ctrlKey && MugShot.cfi > -1) {
+  if (e.keyCode === 90 && e.ctrlKey && MugShot.cfi > -1) {
     MugShot.deleteMugShot();
   }
 }
@@ -528,10 +609,10 @@ function doneWithText(e) {
   MugShot.mugs[index].frame.name = e.target.value;
   MugShot.mugs[index].frame.el.title = e.target.value;
 
-  if (e.keyCode == 13) {
+  if (e.keyCode === 13) {
     MugShot.toggleElementSet(index, 'off');
     var vis = MugShot.tagList.querySelectorAll('.mugshot-tag-list-show');
-    var v = (vis.length == 1) ? vis[0].innerHTML : e.target.value;
+    var v = (vis.length === 1) ? vis[0].innerHTML : e.target.value;
     MugShot.mugs[index].frame.name = v;
     MugShot.mugs[index].frame.el.title = v;
     MugShot.mugs[index].frame.confirmed = true;
@@ -557,13 +638,13 @@ function doneWithText(e) {
       }
     }
 
-    MugShot.tagList.style.display = (j < 10 && j != 0) ? 'block' : 'none';
+    MugShot.tagList.style.display = (j < 10 && j !== 0) ? 'block' : 'none';
   }
 }
 
 function refreshOnResize(e) {
 
-  if(e.type == 'click') {
+  if (e.type == 'click') {
     setTimeout(function () {
       MugShot.refreshImgData();
       MugShot.updateWrapper();

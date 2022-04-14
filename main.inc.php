@@ -10,7 +10,7 @@ Has Settings: webmaster
 
 defined('PHPWG_ROOT_PATH') or die('Hacking attempt!');
 
-global $conf, $config_default;
+global $conf, $config_default, $MugShot_logger;
 
 if (!isset($conf['MugShot'])):
   include(dirname(__FILE__).'/include/config_default.inc.php');
@@ -30,7 +30,13 @@ define('MUGSHOT_BASE_URL',   get_root_url() . 'admin.php?page=plugin-' . MUGSHOT
 define('MUGSHOT_VERSION', '2.0.2-0.1');
 define('MUGSHOT_TABLE', 'face_tag_positions');
 
-include_once MUGSHOT_PATH . 'include/logger.inc.php';
+include_once PHPWG_ROOT_PATH . 'include/Logger.class.php';
+
+$MugShot_logger = new Logger(array(
+    'directory' => MUGSHOT_PATH . 'logs',
+    'severity' => $conf['log_level'],
+    'filename' => 'log_' . date('Y-m-d') . '_MugShot.log',
+));
 
 /*
  * API Functions
@@ -174,12 +180,21 @@ function defined_tags($max_tags) {
 /*
  * Queries tagged faces for the image id
  */
+/*
+ *
+ *  if(isnull(mst.face_index), -1, mst.face_index) as face_index,
+ *  if(isnull(mst.tag_id), -1, mst.tag_id) as tag_id,
+ *  if(isnull(tt.name), '', tt.name) as name
+ */
 function defined_mugshots( $id ) {
+  global $MugShot_logger;
+
   $mugshotSql = "
   SELECT
+    mst.id as face_id,
     mst.image_id,
-    if(not isnull(mst.tag_id), mst.tag_id, 0) as tag_id,
-    if(not isnull(mst.face_index) and mst.face_index > 0, mst.face_index, -1) as face_index,
+    mst.face_index,
+    mst.tag_id,
     mst.top,
     mst.lft,
     mst.width,
@@ -187,7 +202,7 @@ function defined_mugshots( $id ) {
     mst.image_width,
     mst.image_height,
     mst.confirmed,
-    if(not isnull(tt.name), tt.name, 'Unidentified Person') as name
+    tt.name
   FROM " . MUGSHOT_TABLE . " AS mst
   LEFT JOIN `" . TAGS_TABLE . "` AS tt ON mst.tag_id = tt.id
   WHERE mst.image_id = $id AND mst.ignored = 0;";
@@ -197,14 +212,11 @@ function defined_mugshots( $id ) {
   if (is_array($mugshotSqlResult)) {
     foreach($mugshotSqlResult as $key => $mugshot) {
       $tag_id = $mugshot['tag_id'];
-      if ($tag_id > 0) {
+      if (!is_null($tag_id) and $tag_id > 0) {
         $tagSql = '
-          SELECT
-            id,
-            url_name
+          SELECT id, url_name
           FROM ' . TAGS_TABLE . '
-          WHERE id=' . $mugshot['tag_id'] . ';
-        ';
+          WHERE id=' . $mugshot['tag_id'] . ';';
         $tagSqlResult = fetch_sql($tagSql, false, false);
         $tagUrl = make_index_url(array('tags' => array($tagSqlResult[0])));
         $mugshotSqlResult[$key]['tag_url'] = $tagUrl;
@@ -214,7 +226,9 @@ function defined_mugshots( $id ) {
     }
   }
 
-  return json_encode($mugshotSqlResult);
+  //$MugShot_logger->info("MugShots SQL results", null, array(var_export($mugshotSqlResult,true)));
+
+  return json_encode($mugshotSqlResult, JSON_NUMERIC_CHECK);
 }
 
 
@@ -223,15 +237,14 @@ function defined_mugshots( $id ) {
  */
 function mugshot_button() {
 
-	if(script_basename() != 'admin') {
+	if (script_basename() != 'admin') {
 
-		global $template, $page;
+		global $template, $page, $MugShot_logger;
 
     /*
      * Path to processing file
      */
     $url = get_root_url() . 'ws.php?format=json&method=mugshot.bookem';
-
 
 		/*
 		 * Assign template variables
@@ -240,7 +253,6 @@ function mugshot_button() {
     $template -> assign('MUGSHOT_ACTION', $url);
     $template -> assign('IMAGE_ID', $page['image_id']);
     $template -> assign('MUGSHOTS', defined_mugshots($page['image_id']));
-
 
 		/*
 		 * Parse button template file and append to picture buttons

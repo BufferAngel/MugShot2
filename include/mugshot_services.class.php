@@ -41,80 +41,104 @@ class MugShot_Services
     return implode(" ", $prettyName);
   }
 
-// Add the posted mugshots to the database
+  // Add the posted mugshots to the database
   static function book_mugshots(array $data, &$service)
   {
-    self::$MugShot_logger->info("Entered ...", null, array('File'=>__FILE__,'Line'=>__LINE__,'Class'=>__CLASS__,'Function'=>__FUNCTION__,'data'=>$data));
+    $unescaped_data = str_replace('\\', '', $data['data']);
+
+    self::$MugShot_logger->info("Entered ...", null, array('File'=>__FILE__, 'Line'=>__LINE__, 'Class'=>__CLASS__,
+        'Function'=>__FUNCTION__,'data'=>$unescaped_data));
+
+    $request = json_decode($unescaped_data, true);
 
     if (!$service -> isPost()) {
       return new PwgError(405, "HTTP POST REQUIRED");
     }
 
-    $imageId = pwg_db_real_escape_string($data['imageId']);
+    $imageId = $request['imageId'];
 
-    unset($data['imageId']);
+    unset($request['imageId']);
     $imageIdTagIdInsertionString = '';        //
     $faceTagPositionsInsertionString = '';    // Variable string. Groups data for entry in SQL database.
+    $deleteFaceIdQuery = '';                  // Delete string. Id in face_tag_positions in the current image being removed.
     $deleteTagQuery = '';                     // Delete string. Tags in the current image being removed.
-    $hideFaceQuery = '';                      // Hidden string. Faces in the currant image being soft-removed.
+    $hideFaceIdQuery = '';                    // Hidden string. Faces in the currant image being soft-removed.
+    $removeMatchFaceIdQuery = '';             // Rejected Match. Remove the tag from face_tag_positions.
 
-    foreach ($data as $key => $value) {
-//    self::$MugShot_logger->info("client data received - ".$key, null, $value);
+    foreach ($request as $key => $value) {
+      self::$MugShot_logger->info("client data received - ".$key, null, array(var_export($value, true)));
 
-      $labeledTagName = self::get_pretty_name($value['name']);
-      $prevTagName = self::get_pretty_name($value['prevName']);
+      $faceId = $value['faceId'];
 
-      $existingTagId = pwg_db_real_escape_string($value['tagId']);
-      $faceIndex = pwg_db_real_escape_string($value['faceIndex']);
-      $top = pwg_db_real_escape_string($value['top']);
-      $left = pwg_db_real_escape_string($value['left']);
-      $width = pwg_db_real_escape_string($value['width']);
-      $height = pwg_db_real_escape_string($value['height']);
-      $imgW = pwg_db_real_escape_string($value['imageWidth']);
-      $imgH = pwg_db_real_escape_string($value['imageHeight']);
-      $rm = pwg_db_real_escape_string($value['removeThis']);
-      $confirmed = pwg_db_real_escape_string($value['confirmed']);
-      $prevConfirmed = pwg_db_real_escape_string($value['prevConfirmed']);
-
-      // If it's a brand-new tag, we won't have sent a tag ID back with the data.
-      if ($rm == 0 && ($existingTagId == -1 || $labeledTagName != $prevTagName) && $labeledTagName != 'Unidentified Person') {
-        $newTagId = tag_id_from_tag_name($labeledTagName);
+      if ($value['name'] != null && $value['name'] != '') {
+        $labeledTagName = self::get_pretty_name($value['name']);
       } else {
-        $newTagId = $existingTagId;
+        $labeledTagName = null;
       }
+
+      $prevTagName = $value['prevName'];
+
+      $existingTagId = $value['tagId'];
+      $faceIndex = $value['faceIndex'];
+      $top = $value['top'];
+      $left = $value['left'];
+      $width = $value['width'];
+      $height = $value['height'];
+      $imgW = $value['imageWidth'];
+      $imgH = $value['imageHeight'];
+      $rm = $value['removeThis'];
+      $confirmed = $value['confirmed'];
+      $prevConfirmed = $value['prevConfirmed'];
 
       // Remove a mugshot
       if ($rm == 1) {
-        if ($existingTagId != '' && $existingTagId != -1) {
-          $deleteTagQuery .= $existingTagId . ',';
-        } elseif ($faceIndex > 0) {
+        if ($faceIndex > 0) {
 //        self::$MugShot_logger->info("Hiding MugShot ...", null, array('File'=>__FILE__,'Line'=>__LINE__,'Class'=>__CLASS__,
 //            'Function'=>__FUNCTION__,'imageID'=>$imageId,'faceIndex'=>$faceIndex));
-          $hideFaceQuery .= $faceIndex . ',';
+          $hideFaceIdQuery .= $faceId . ',';
+        } else {
+          $deleteFaceIdQuery .= $faceId . ',';
+        }
+        if ($existingTagId != null) {
+          $deleteTagQuery .= $existingTagId . ',';
         }
         continue;
       }
 
       // If something empty was submitted, just ignore it.
-      if ($labeledTagName == '' || $labeledTagName == 'Unidentified Person') {
+      if ($faceId == null && ($labeledTagName == null || $labeledTagName == '')) {
         continue;
       }
 
-      // Add a mugshot
-      if ($existingTagId == -1) {
-        $faceTagPositionsInsertionString .= "('$newTagId','$imageId','$top','$left','$width','$height','$imgW','$imgH',TRUE),";
-        $imageIdTagIdInsertionString .= "('$imageId','$newTagId'),";
+      // Handle a rejected match
+      if ($labeledTagName == null && $existingTagId != null) {
+        $removeMatchFaceIdQuery .= $faceId . ',';
+        continue;
       }
 
-      // Update a mugshot
-      if (($existingTagId != -1 && $existingTagId != $newTagId) || $prevConfirmed != $confirmed) {
-        $sql = "UPDATE " . MUGSHOT_TABLE . " AS ftp SET ftp.tag_id='$newTagId', ftp.confirmed=$confirmed "
-            ."WHERE ftp.image_id = '$imageId' AND ".($existingTagId == 0 ? "ftp.face_index = $faceIndex" : "ftp.tag_id = $existingTagId").";";
+      // If it's a brand-new tag, there won't be a tag ID.
+      if ($labeledTagName != null && $labeledTagName != $prevTagName) {
+        $newTagId = tag_id_from_tag_name($labeledTagName);
+      } else {
+        $newTagId = $existingTagId;
+      }
+
+      if ($faceId == null && $existingTagId == null) {
+        // Add a new mugshot
+        $faceTagPositionsInsertionString .= "('$newTagId','$imageId','$top','$left','$width','$height','$imgW','$imgH',TRUE),";
+        $imageIdTagIdInsertionString .= "('$imageId','$newTagId'),";
+      } elseif ($existingTagId != $newTagId || $prevConfirmed != $confirmed) {
+        // Update a mugshot
+        $sql = "UPDATE " . MUGSHOT_TABLE . " AS ftp SET ftp.tag_id = $newTagId, ftp.confirmed = $confirmed "
+            ."WHERE ftp.id = $faceId;";
         pwg_query($sql);
         if ($existingTagId > 0) {
-          $sql = "UPDATE " . IMAGE_TAG_TABLE . " AS pit SET pit.tag_id='$newTagId' "
-              . "WHERE pit.image_id = '$imageId' AND pit.tag_id = '$existingTagId';";
+          $sql = "UPDATE " . IMAGE_TAG_TABLE . " AS pit SET pit.tag_id = $newTagId "
+              . "WHERE pit.image_id = $imageId AND pit.tag_id = $existingTagId;";
           pwg_query($sql);
+          if (pwg_db_changes() == 0) {
+            $imageIdTagIdInsertionString .= "('$imageId','$newTagId'),";
+          }
         } else {
           $imageIdTagIdInsertionString .= "('$imageId','$newTagId'),";
         }
@@ -133,6 +157,7 @@ class MugShot_Services
     } else {
       $frameResult = true;
     }
+
     if ($imageIdTagIdInsertionString !== '') {
       $imageIdTagIdInsertionString = substr(trim($imageIdTagIdInsertionString), 0, -1);
       $imageIdTagIdInsertionString = "INSERT IGNORE INTO " . IMAGE_TAG_TABLE
@@ -143,27 +168,30 @@ class MugShot_Services
     }
 
     // Delete mugshot
-    if ($deleteTagQuery !== '') {
-      $deleteTagQuery = '(' . substr(trim($deleteTagQuery), 0, -1) . ')';
-      $deleteSql1 = "DELETE FROM " . MUGSHOT_TABLE
-          ." WHERE `tag_id` IN $deleteTagQuery AND `image_id`='$imageId' AND (`face_index` IS NULL OR `face_index` = 0);";
-      $deleteSql2 = "DELETE FROM " . IMAGE_TAG_TABLE
-          ." WHERE `tag_id` IN $deleteTagQuery AND `image_id`='$imageId';";
+    if ($deleteFaceIdQuery !== '') {
+      $deleteFaceIdQuery = '(' . substr(trim($deleteFaceIdQuery), 0, -1) . ')';
+      $deleteSql1 = "DELETE FROM " . MUGSHOT_TABLE. " WHERE `id` IN $deleteFaceIdQuery;";
       $dResult1 = pwg_query($deleteSql1);
-      $dResult2 = pwg_query($deleteSql2);
     } else {
       $dResult1 = true;
+    }
+
+    if ($deleteTagQuery !== '') {
+      $deleteTagQuery = '(' . substr(trim($deleteTagQuery), 0, -1) . ')';
+      $deleteSql2 = "DELETE FROM " . IMAGE_TAG_TABLE
+          ." WHERE `tag_id` IN $deleteTagQuery AND `image_id` = $imageId;";
+      $dResult2 = pwg_query($deleteSql2);
+    } else {
       $dResult2 = true;
     }
 
     // Hide mugshot
-    if ($hideFaceQuery !== '') {
-
-      $hideFaceQuery = '(' . substr(trim($hideFaceQuery), 0, -1) . ')';
+    if ($hideFaceIdQuery !== '') {
+      $hideFaceIdQuery = '(' . substr(trim($hideFaceIdQuery), 0, -1) . ')';
       // We don't actually remove detected entries from the database we just mark them to be ignored
       // Otherwise they'll reappear if detection is re-run on that photo
       $hideSql = "UPDATE " . MUGSHOT_TABLE . " AS ftp SET ftp.ignored = TRUE "
-          ."WHERE ftp.face_index IN $hideFaceQuery AND ftp.image_id='$imageId';";
+          ."WHERE ftp.id IN $hideFaceIdQuery;";
 //    self::$MugShot_logger->info("Hide MugShot", null, array('File'=>__FILE__,'Line'=>__LINE__,'Class'=>__CLASS__,
 //        'Function'=>__FUNCTION__,'ImageId'=>$imageId,'hideFaceQuery'=>$hideFaceQuery,'hideSql'=>$hideSql));
       $dResult3 = pwg_query($hideSql);
@@ -171,7 +199,17 @@ class MugShot_Services
       $dResult3 = true;
     }
 
-    return json_encode([$existingTagIdResult, $frameResult, $dResult1, $dResult2, $dResult3]);
+    // Handle Rejected Match by removing tag
+    if ($removeMatchFaceIdQuery !== '') {
+      $removeMatchFaceIdQuery = '(' . substr(trim($removeMatchFaceIdQuery), 0, -1) . ')';
+      $removeMatchSql = "UPDATE " . MUGSHOT_TABLE . " AS ftp SET ftp.tag_id = null "
+          ."WHERE ftp.id IN $removeMatchFaceIdQuery;";
+      $dResult4 = pwg_query($removeMatchSql);
+    } else {
+      $dResult4 = true;
+    }
+
+    return json_encode([$existingTagIdResult, $frameResult, $dResult1, $dResult2, $dResult3, $dResult4]);
   }
 }
 

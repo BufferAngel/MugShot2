@@ -1,10 +1,10 @@
 @font-face {
   font-family: 'mugshot';
-  src:  url('fonts/mugshot.eot?wkabwg');
-  src:  url('fonts/mugshot.eot?wkabwg#iefix') format('embedded-opentype'),
-    url('fonts/mugshot.ttf?wkabwg') format('truetype'),
-    url('fonts/mugshot.woff?wkabwg') format('woff'),
-    url('fonts/mugshot.svg?wkabwg#mugshot') format('svg');
+  src:  url('fonts/mugshot.eot?c6fvdy');
+  src:  url('fonts/mugshot.eot?c6fvdy#iefix') format('embedded-opentype'),
+    url('fonts/mugshot.ttf?c6fvdy') format('truetype'),
+    url('fonts/mugshot.woff?c6fvdy') format('woff'),
+    url('fonts/mugshot.svg?c6fvdy#mugshot') format('svg');
   font-weight: normal;
   font-style: normal;
   /* font-display: block; */
@@ -12,6 +12,7 @@
 
 .mugshot-icon {
   font-family: 'mugshot' !important;
+  speak: never;
   font-style: normal;
   font-weight: normal;
   font-variant: normal;
@@ -25,11 +26,16 @@
   content: "\e900";
 }
 
-.mugshot-icon-cross:before {
-  content: "\ea0f";
+.mugshot-icon-trash-2:before {
+  content: "\e90d";
 }
-.mugshot-icon-checkmark:before {
-  content: "\ea10";
+
+.mugshot-icon-thumb-up:before {
+  content: "\e903";
+}
+
+.mugshot-icon-thumb-down:before {
+  content: "\e902";
 }
 
 .mugshot-frame {
@@ -85,7 +91,11 @@
   color: inherit;
 }
 
-.mugshot-selecting .mugshot-confirm {
+.mugshot-selecting .mugshot-accept-match {
+  visibility: visible;
+}
+
+.mugshot-selecting .mugshot-reject-match {
   visibility: visible;
 }
 
@@ -127,12 +137,22 @@
   z-index: 1500;
 }
 
-.mugshot-confirm {
+.mugshot-face-toolbar {
+  pointer-events: auto;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  font-size: 20px;
+  top: -24px;
+  visibility: visible;
+  z-index: 1500;
+}
+
+.mugshot-accept-match {
   align-content: center;
   background-color: green;
   border: none;
   color: white;
-  float: left;
   font-weight: bold;
   margin-left: -3px;
   margin-top: -3px;
@@ -141,7 +161,24 @@
   z-index: 1600;
 }
 
-.mugshot-confirm:hover {
+.mugshot-accept-match:hover {
+  cursor: pointer;
+}
+
+.mugshot-reject-match {
+  align-content: center;
+  background-color: red;
+  border: none;
+  color: white;
+  font-weight: bold;
+  margin-left: -3px;
+  margin-top: -3px;
+  padding: 1px 2px 1px 2px;
+  visibility: hidden;
+  z-index: 1600;
+}
+
+.mugshot-reject-match:hover {
   cursor: pointer;
 }
 
@@ -150,7 +187,6 @@
   background-color: red;
   border: none;
   color: white;
-  float: right;
   font-weight: bold;
   margin-right: -3px;
   margin-top: -3px;
@@ -169,7 +205,6 @@
 
 .mugshot-tag-list {
   background: white;
-  background-color: white;
   border: 1px solid grey;
   border-radius: 4px;
   display: none;
