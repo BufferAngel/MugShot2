@@ -44,6 +44,11 @@ $MugShot_logger = new Logger(array(
 //$ws_file = MUGSHOT_PATH . 'include/capture.php';
 
 /*
+ * API Functions
+ */
+//$ws_file = MUGSHOT_PATH . 'include/capture.php';
+
+/*
  * Admin Event Handlers
  */
 $events_class_file = MUGSHOT_PATH . 'include/mugshot_events.class.php';

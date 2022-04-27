@@ -610,7 +610,7 @@ function doneWithText(e) {
   if (e.keyCode === 13) {
     MugShot.toggleElementSet(index, 'off');
     var vis = MugShot.tagList.querySelectorAll('.mugshot-tag-list-show');
-    var v = (vis.length === 1) ? vis[0].innerHTML : e.target.value;
+    var v = (vis.length == 1) ? vis[0].innerHTML : e.target.value;
     MugShot.mugs[index].frame.name = v;
     MugShot.mugs[index].frame.el.title = v;
     MugShot.mugs[index].frame.confirmed = true;
