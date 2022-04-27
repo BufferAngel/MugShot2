@@ -281,8 +281,8 @@ var MugShot = {
   setText: (function (e) {
     var el = document.getElementById(MugShot.lai);
     var i = parseInt(el.id.replace('name_', ''));
-    el.value = e.innerHTML;
-    e.parentNode.style.display = 'none';
+    el.value = e.options[e.selectedIndex].innerHTML;
+    e.style.display = 'none';
     MugShot.toggleElementSet(i, 'off');
     MugShot.mugs[i].frame.name = el.value;
     MugShot.mugs[i].frame.el.title = el.value;
@@ -393,7 +393,7 @@ var MugShot = {
 
   createDeleteButton: (function () {
     var btn = document.createElement('span');
-    btn.className = 'mugshot-delete mugshot-icon mugshot-icon-trashcan';
+    btn.className = 'mugshot-delete mugshot-icon mugshot-icon-trash-2';
     btn.title = 'Delete Tag';
     btn.id = 'remove_' + this.cfi;
     btn.onclick = this.deleteMugShot.bind(this);
@@ -457,11 +457,9 @@ var MugShot = {
     this.xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
     this.xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
     this.xhr.responseType = 'json';
-//    let request_data = JSON.stringify(data);
-//    let request_wrapper = [];
-//    request_wrapper['data'] = request_data;
-    let request_params = this.urlEncodeData([data=>JSON.stringify(data)]); // request_wrapper);
-    this.xhr.send(request_params);
+    let request_wrapper = [];
+    request_wrapper['data'] = JSON.stringify(data);
+    this.xhr.send(this.urlEncodeData(request_wrapper));
   }),
 
   parseFromServer: (function (e) {
@@ -624,9 +622,10 @@ function doneWithText(e) {
     MugShot.tagList.style.display = 'none';
   } else {
     var filter = e.target.value.toUpperCase();
-    var list = MugShot.tagList.querySelectorAll('li');
+    var list = MugShot.tagList.querySelectorAll('option');
     var i = 0;
     var j = 0;
+    var firstIndex = -1;
 
     MugShot.lai = e.target.id;
     MugShot.refreshTagListPosition(index);
@@ -634,13 +633,18 @@ function doneWithText(e) {
     for (i = 0; i < list.length; i++) {
       if (list[i].innerHTML.toUpperCase().indexOf(filter) > -1) {
         list[i].className = 'mugshot-tag-list-show';
+        if (firstIndex == -1) {
+          firstIndex = i;
+        }
         j += 1;
       } else {
         list[i].className = '';
       }
     }
 
+    MugShot.tagList.selectedIndex = firstIndex;
     MugShot.tagList.style.display = (j < 10 && j !== 0) ? 'block' : 'none';
+    MugShot.tagList.focus();
   }
 }
 

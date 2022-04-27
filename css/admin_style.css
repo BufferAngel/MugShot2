@@ -142,7 +142,7 @@
   margin: 0;
   padding: 0;
   position: absolute;
-  font-size: 20px;
+  font-size: 16px;
   top: -24px;
   visibility: visible;
   z-index: 1500;
@@ -216,7 +216,7 @@
   z-index: 1500;
 }
 
-.mugshot-tag-list li {
+.mugshot-tag-list option {
   border-radius: 4px;
   color: black;
   cursor: pointer;
