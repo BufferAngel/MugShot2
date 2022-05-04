@@ -37,7 +37,7 @@ if (empty($conf['MugShot_tabs']))
   $conf['MugShot_tabs'] = $tabs;
 }
 
-$page['tab'] = isset($_GET['tab']) ? $_GET['tab'] : $conf['MugShot_tabs'][0]['code'];
+$page['tab'] = $_GET['tab'] ?? $conf['MugShot_tabs'][0]['code'];
 
 if (!in_array($page['tab'], $conf['MugShot_tabs'][0])) die('Hacking attempt!');
 
@@ -113,7 +113,7 @@ $template->assign(
 	array(
 	  'CACHE_KEYS' => get_admin_client_cache_keys(array('groups')),
 	  'groups' => $group_ids,
-		'groups_selected' => isset($data['groups']) ? $data['groups'] : []
+		'groups_selected' => $data['groups'] ?? []
 	)
 );
 

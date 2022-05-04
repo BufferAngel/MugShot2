@@ -9,8 +9,6 @@ var MugShot = {
 
   postAction: false,
 
-  lai: false,
-
   submitBtn: '',
 
   tagList: '',
@@ -279,10 +277,9 @@ var MugShot = {
   }),
 
   setText: (function (e) {
-    var el = document.getElementById(MugShot.lai);
+    var el = e.target;
     var i = parseInt(el.id.replace('name_', ''));
-    el.value = e.options[e.selectedIndex].innerHTML;
-    e.style.display = 'none';
+
     MugShot.toggleElementSet(i, 'off');
     MugShot.mugs[i].frame.name = el.value;
     MugShot.mugs[i].frame.el.title = el.value;
@@ -297,17 +294,6 @@ var MugShot = {
     this.mugs[index].frame.el.style.left = left + 'px';
     this.mugs[index].frame.el.style.height = height + 'px';
     this.mugs[index].frame.el.style.width = width + 'px';
-  }),
-
-  refreshTagListPosition: (function (index) {
-    if (this.lai !== false) {
-      index = (index === true) ? parseInt(this.lai.replace('name_', '')) : index;
-      var o = this.mugs[index].name.el.getBoundingClientRect();
-      var t = o.height + o.top - MugShot.offset.top;
-      this.tagList.style.left = this.mugs[index].name.el.style.left;
-      this.tagList.style.width = o.width + 'px';
-      this.tagList.style.top = t + 'px';
-    }
   }),
 
   refreshCapture: (function () {
@@ -342,12 +328,14 @@ var MugShot = {
     var mug = this.mugs[this.cfi].frame;
     var name = document.createElement('input');
     name.addEventListener('keyup', doneWithText);
+    name.addEventListener('change', MugShot.setText);
     name.id = this.mugs[this.cfi].name.id;
     name.value = mug.name != null ? mug.name : '';
     name.className = 'mugshot-textbox';
     name.style.top = parseInt(mug.top) + parseInt(mug.height) + 'px';
     name.style.left = mug.el.style.left;
     name.style.width = mug.el.style.width;
+    name.setAttribute('list', 'mugshot-tags');
     document.getElementById(this.id2).append(name);
     this.mugs[this.cfi].name.el = name;
     this.mugs[this.cfi].frame.el.title = mug.name != null ? mug.name : 'Unidentified Person';
@@ -414,7 +402,6 @@ var MugShot = {
     var data = {};
 
     this.toggleSubmitBtn('off');
-    this.tagList.style.display = 'none';
 
     if (this.mugs.length > 0) {
 
@@ -431,7 +418,7 @@ var MugShot = {
     }
   }),
 
-  urlEncodeData: (function (obj, prefix) {
+  urlEncodeData: (function (obj, prefix=null) {
     var str = [];
     var p;
     var k;
@@ -515,7 +502,6 @@ var MugShot = {
     this.mugs[index].frame.removeThis = 1;
     this.toggleElementSet(index, 'off');
     this.toggleSubmitBtn('on');
-    this.tagList.style.display = 'none';
   }),
 };
 
@@ -598,51 +584,21 @@ function updateBoundingBox(e) {
 
 function reverseCapture(e) {
   if (e.keyCode === 90 && e.ctrlKey && MugShot.cfi > -1) {
-    MugShot.deleteMugShot();
+    MugShot.deleteMugShot(e);
   }
 }
 
 function doneWithText(e) {
   var index = parseInt(e.target.id.replace('name_', ''));
-  MugShot.mugs[index].frame.name = e.target.value;
-  MugShot.mugs[index].frame.el.title = e.target.value;
 
   if (e.keyCode === 13) {
     MugShot.toggleElementSet(index, 'off');
-    var vis = MugShot.tagList.querySelectorAll('.mugshot-tag-list-show');
-    var v = (vis.length == 1) ? vis[0].innerHTML : e.target.value;
-    MugShot.mugs[index].frame.name = v;
-    MugShot.mugs[index].frame.el.title = v;
+    MugShot.mugs[index].frame.name = e.target.value;
+    MugShot.mugs[index].frame.el.title = e.target.value;
     MugShot.mugs[index].frame.confirmed = true;
     MugShot.mugs[index].frame.el.classList.replace('mugshot-unconfirmed', 'mugshot-confirmed');
 
     MugShot.mugs[index].active = false;
-    MugShot.tagList.style.display = 'none';
-  } else {
-    var filter = e.target.value.toUpperCase();
-    var list = MugShot.tagList.querySelectorAll('option');
-    var i = 0;
-    var j = 0;
-    var firstIndex = -1;
-
-    MugShot.lai = e.target.id;
-    MugShot.refreshTagListPosition(index);
-
-    for (i = 0; i < list.length; i++) {
-      if (list[i].innerHTML.toUpperCase().indexOf(filter) > -1) {
-        list[i].className = 'mugshot-tag-list-show';
-        if (firstIndex == -1) {
-          firstIndex = i;
-        }
-        j += 1;
-      } else {
-        list[i].className = '';
-      }
-    }
-
-    MugShot.tagList.selectedIndex = firstIndex;
-    MugShot.tagList.style.display = (j < 10 && j !== 0) ? 'block' : 'none';
-    MugShot.tagList.focus();
   }
 }
 

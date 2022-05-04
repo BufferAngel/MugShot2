@@ -203,35 +203,6 @@
   content: "SAVE";
 }
 
-.mugshot-tag-list {
-  background: white;
-  border: 1px solid grey;
-  border-radius: 4px;
-  display: none;
-  list-style-type: none;
-  margin-top: 3px;
-  padding: 6px 6px;
-  pointer-events: auto;
-  position: absolute;
-  z-index: 1500;
-}
-
-.mugshot-tag-list option {
-  border-radius: 4px;
-  color: black;
-  cursor: pointer;
-  display: none;
-  font-family: "arial-black";
-  font-size: 16px;
-  max-width: 150px;
-  padding: 0 0 0 6px;
-  z-index: 1500;
-}
-
-.mugshot-tag-list-show {
-  display: block !important;
-}
-
 #reflay,
 #MugShotDiv {
   /* border: 1px solid red; */
